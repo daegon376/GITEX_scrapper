@@ -5,14 +5,15 @@ from bs4 import BeautifulSoup
 
 SPEAKERS_URL = 'https://gitex.com/speakers/'
 
-EDU_KEYWORDS = ['education', 'edu', 'educational', 'ministry of education', 'ministries', 'government', 'govt',
-                'higher education', 'learning', 'ph.d.', 'digital learning', 'edtech', 'edutech', 'exam', 'teacher',
-                'professor', 'mba']
-OTHER_KEYWORDS = ['chief executive officer', 'ceo', 'founder', 'proctoring', 'artificial intelligence', ' ai ',
-                  'machine learning', ' ml', 'start-up']
+EDU_KEYWORDS = ['education', 'educational', 'ministry of education', 'higher education', 'learning', 'ph.d.',
+                'digital learning', 'edtech', 'edutech', 'exam', 'teacher', 'professor']
+OTHER_KEYWORDS = ['chief executive officer', 'ceo', 'cmo', 'coo', 'founder', 'proctoring', 'artificial intelligence',
+                  ' ai ', 'machine learning', ' ml', 'start-up', 'ministries', 'government', 'govt']
 
 DROPOUT_KEYWORDS = ['filmmaker', 'actor', 'singer', 'artist', 'trader', 'blogger', 'vlogger', 'creative', 'model',
                     'ambassador', 'author', 'fashion']
+
+SCORE_PASSING_VAL = 2
 
 
 def load_page(link):
@@ -27,6 +28,8 @@ def speakers_to_dict(speakers):
     names = []
     countries = []
     keywords = []
+    occupation = []
+    bio = []
     links = []
     social = []
 
@@ -35,11 +38,14 @@ def speakers_to_dict(speakers):
         names.append(person.name)
         countries.append(person.country)
         keywords.append(', '.join(person.keywords))
+        occupation.append(person.occupation)
+        bio.append(person.bio)
         links.append(person.link)
         social.append(', '.join(person.social_networks))
 
     speakers_dict = {'Score': scores, 'Name': names, 'Country': countries,
-                     'Key-words': keywords, 'Link': links, 'Social networks': social}
+                     'Key-words': keywords, 'Occupation': occupation, 'Bio': bio,
+                     'Link': links, 'Social networks': social}
 
     return speakers_dict
 
@@ -59,14 +65,14 @@ class Speaker:
         for item in social_networks:
             self.social_networks.append(item.get('href'))
 
-        self.full_description = ''
+        self.bio = ''
         full_description = self.page.find('div', {'class': 'speaker-about'}).find_all('p')
         for paragraph in full_description:
-            self.full_description += paragraph.text.strip() + '\n'
+            self.bio += paragraph.text.strip() + '\n'
 
     def find_keywords(self, keywords_set, scoring=1, add_keyword=True):
         initial_score = self.score
-        occupation_description = '\n'.join([self.full_description.lower(), self.occupation.lower()])
+        occupation_description = '\n'.join([self.bio.lower(), self.occupation.lower()])
         for keyword in keywords_set:
             if keyword in occupation_description:
                 self.score += occupation_description.count(keyword) * scoring
@@ -84,13 +90,15 @@ if __name__ == '__main__':
     others_category = []
 
     for i, speaker_block in enumerate(speakers_blocks):
-        progress = round((i / number_of_speakers) * 100, 2)
-        print(str(progress) + '% done')
+        progress = round(((i + 1) / number_of_speakers) * 100, 2)
+        print('\r', end='')
+        print(str(progress) + '% done', end="", flush=True)
         speaker = Speaker(speaker_block)
         edu_score = speaker.find_keywords(EDU_KEYWORDS)
         other_score = speaker.find_keywords(OTHER_KEYWORDS)
         dropout_score = speaker.find_keywords(DROPOUT_KEYWORDS, scoring=-5, add_keyword=False)
-        if speaker.score > 0:
+
+        if speaker.score >= SCORE_PASSING_VAL:
             if edu_score > other_score:
                 education_category.append(speaker)
             else:
